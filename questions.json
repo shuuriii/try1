@@ -1,0 +1,64 @@
+{
+  "project_context": {
+    "lead_clinical_officer": "Dr. Surekha, MBBS",
+    "academic_context": "IIT Madras Applied AI/ML Week 22",
+    "objective": "Pre-payment lead qualification for adult ADHD"
+  },
+  "instruments": [
+    {
+      "id": "ASRS_V1_1",
+      "title": "Adult ADHD Self-Report Scale (Screener)",
+      "version": "WHO 1.1",
+      "scoring_logic": "4+ checkmarks in shaded boxes of Part A (Questions 1-6) indicates high likelihood.",
+      "sections": {
+        "part_a": {
+          "description": "Six questions most predictive of symptoms.",
+          "questions": [
+            {"id": "a1", "text": "Trouble wrapping up final details of a project?", "shaded_threshold": 2},
+            {"id": "a2", "text": "Difficulty getting things in order for tasks requiring organization?", "shaded_threshold": 2},
+            {"id": "a3", "text": "Problems remembering appointments or obligations?", "shaded_threshold": 2},
+            {"id": "a4", "text": "Avoiding or delaying tasks that require a lot of thought?", "shaded_threshold": 3},
+            {"id": "a5", "text": "Fidgeting/squirming when required to sit for long periods?", "shaded_threshold": 3},
+            {"id": "a6", "text": "Feeling overly active and driven by a motor?", "shaded_threshold": 3}
+          ]
+        },
+        "part_b": {
+          "description": "Additional 12 questions for clinical nuance.",
+          "questions": [
+            {"id": "b7", "text": "Careless mistakes on boring/difficult projects?"},
+            {"id": "b8", "text": "Difficulty keeping attention on repetitive work?"},
+            {"id": "b9", "text": "Difficulty concentrating even when spoken to directly?"},
+            {"id": "b10", "text": "Misplacing or losing things at home/work?"},
+            {"id": "b11", "text": "Distracted by activity/noise around you?"},
+            {"id": "b12", "text": "Leaving seat in meetings/expected situations?"},
+            {"id": "b13", "text": "Feeling restless or fidgety?"},
+            {"id": "b14", "text": "Difficulty unwinding/relaxing during downtime?"},
+            {"id": "b15", "text": "Talking too much in social situations?"},
+            {"id": "b16", "text": "Finishing others' sentences prematurely?"},
+            {"id": "b17", "text": "Difficulty waiting your turn?"},
+            {"id": "b18", "text": "Interrupting others when they are busy?"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "WURS_25",
+      "title": "Wender Utah Rating Scale",
+      "objective": "Retrospective Childhood Assessment",
+      "scoring_logic": "Score > 46 suggests childhood ADHD context.",
+      "questions": [
+        {"id": "w1", "text": "Concentration problems, easily distracted"},
+        {"id": "w2", "text": "Anxious, worrying"},
+        {"id": "w15", "text": "Acting without thinking, impulsive"},
+        {"id": "w25", "text": "Not achieving up to potential"}
+      ]
+    }
+  ],
+  "response_scale": [
+    {"label": "Never", "value": 0},
+    {"label": "Rarely", "value": 1},
+    {"label": "Sometimes", "value": 2},
+    {"label": "Often", "value": 3},
+    {"label": "Very Often", "value": 4}
+  ]
+}
