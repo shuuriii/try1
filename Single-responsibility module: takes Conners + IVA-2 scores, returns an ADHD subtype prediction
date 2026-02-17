@@ -1,0 +1,200 @@
+"""
+adhd_predictor.py
+-----------------
+Single-responsibility module: takes Conners + IVA-2 scores,
+returns an ADHD subtype prediction.
+
+Later, the 10 input parameters will come from:
+  - Mini-games     → Aqvis, Aqaudi, RCQvis, RCQaudi, Aqtot, RCQtot
+  - Questionnaire  → cIM, cHR, cIE, cSC
+
+Output:
+  - subtype  : 0 = No ADHD, 1 = Inattentive, 2 = Combined
+  - label    : human-readable string
+  - confidence : 0.0 → 1.0 (how sure the model is)
+"""
+
+import numpy as np
+import pandas as pd
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+import joblib
+import os
+
+
+# ── Column names the model expects ────────────────────────────────────────────
+CONNERS_COLS   = ['cIM', 'cHR', 'cIE', 'cSC']
+IVA2_COLS      = ['Aqtot', 'Aqaudi', 'Aqvis', 'RCQtot', 'RCQaudi', 'RCQvis']
+FEATURE_COLS   = CONNERS_COLS + IVA2_COLS          # 10 features total
+TARGET_COL     = 'adhdtype'
+
+SUBTYPE_LABELS = {
+    0: "No ADHD",
+    1: "ADHD — Inattentive",
+    2: "ADHD — Combined (Inattentive + Hyperactive)"
+}
+
+# Paths for saving/loading the trained model
+MODEL_PATH  = "adhd_knn_model.joblib"
+SCALER_PATH = "adhd_scaler.joblib"
+
+
+# ── 1. TRAIN  (run once on your research CSV) ─────────────────────────────────
+def train(csv_path: str, save: bool = True) -> dict:
+    """
+    Trains the KNN classifier on the research dataset.
+    Run this once. The model is saved to disk so predict() can load it.
+
+    Parameters
+    ----------
+    csv_path : str   path to df_analysis.csv
+    save     : bool  whether to save the model to disk (default True)
+
+    Returns
+    -------
+    dict with accuracy + full classification report
+    """
+    # Load + clean (drop EEG/ECG columns, deduplicate by participant)
+    df = pd.read_csv(csv_path, index_col=0)
+    df['Gender']    = df['Gender'].astype(str)
+    df['adhdtype']  = df['adhdtype'].astype(str)
+
+    drop_cols = ['brain_oscillation', 'electrode', 'fft_abs_power', 'subtype']
+    df = df.drop(columns=[c for c in drop_cols if c in df.columns])
+    df = df.drop_duplicates(subset=['id']).reset_index(drop=True)
+
+    # Features + target
+    X = df[FEATURE_COLS].astype(float)
+    y = df[TARGET_COL].astype(int)
+
+    # Scale (KNN is distance-based — scaling is required)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Split 80/20
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_scaled, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    # Train
+    model = KNeighborsClassifier(n_neighbors=5)
+    model.fit(X_train, y_train)
+
+    # Evaluate
+    y_pred   = model.predict(X_test)
+    accuracy = round(model.score(X_test, y_test), 4)
+    report   = classification_report(y_test, y_pred, target_names=list(SUBTYPE_LABELS.values()))
+
+    print(f"✓ Model trained — Accuracy: {accuracy:.0%}")
+    print(report)
+
+    # Save to disk so predict() works without retraining
+    if save:
+        joblib.dump(model,  MODEL_PATH)
+        joblib.dump(scaler, SCALER_PATH)
+        print(f"✓ Model saved  → {MODEL_PATH}")
+        print(f"✓ Scaler saved → {SCALER_PATH}")
+
+    return {"accuracy": accuracy, "report": report, "model": model, "scaler": scaler}
+
+
+# ── 2. PREDICT  (called by your app/games at runtime) ─────────────────────────
+def predict(
+    # Conners scores — from questionnaire
+    cIM:  float,   # Inattention / Memory
+    cHR:  float,   # Hyperactivity / Restlessness
+    cIE:  float,   # Impulsivity / Emotional Lability
+    cSC:  float,   # Self Concept
+
+    # IVA-2 scores — from mini-games (calculated from reaction time data)
+    Aqtot:   float,  # General Attention Quotient
+    Aqaudi:  float,  # Auditory Attention      ← auditory game
+    Aqvis:   float,  # Visual Attention         ← go/no-go game
+    RCQtot:  float,  # General Response Control
+    RCQaudi: float,  # Auditory Response Control ← auditory game
+    RCQvis:  float,  # Visual Response Control   ← go/no-go game
+
+    model=None,
+    scaler=None
+) -> dict:
+    """
+    Returns an ADHD subtype prediction for a single user.
+
+    Parameters
+    ----------
+    All 10 floats — Conners (4) + IVA-2 (6)
+    model / scaler — pass in directly OR leave None to load from disk
+
+    Returns
+    -------
+    {
+        "subtype"     : 0 | 1 | 2,
+        "label"       : "ADHD — Inattentive",
+        "confidence"  : 0.68,
+        "all_probs"   : {0: 0.12, 1: 0.68, 2: 0.20}
+    }
+    """
+    # Load model from disk if not passed in
+    if model is None or scaler is None:
+        if not os.path.exists(MODEL_PATH):
+            raise FileNotFoundError(
+                "No trained model found. Run train('your_data.csv') first."
+            )
+        model  = joblib.load(MODEL_PATH)
+        scaler = joblib.load(SCALER_PATH)
+
+    # Build input array in the exact order the model was trained on
+    features = np.array([[cIM, cHR, cIE, cSC,
+                          Aqtot, Aqaudi, Aqvis,
+                          RCQtot, RCQaudi, RCQvis]])
+
+    features_scaled = scaler.transform(features)
+
+    # Predict
+    subtype      = int(model.predict(features_scaled)[0])
+    probabilities = model.predict_proba(features_scaled)[0]
+    all_probs    = {int(cls): round(float(p), 3)
+                   for cls, p in zip(model.classes_, probabilities)}
+
+    return {
+        "subtype"    : subtype,
+        "label"      : SUBTYPE_LABELS[subtype],
+        "confidence" : round(float(probabilities[list(model.classes_).index(subtype)]), 3),
+        "all_probs"  : all_probs
+    }
+
+
+# ── 3. QUICK TEST  (run this file directly to verify everything works) ─────────
+if __name__ == "__main__":
+    import sys
+
+    print("=" * 55)
+    print("  ADHD Predictor — Quick Test")
+    print("=" * 55)
+
+    # If a CSV path is passed, train first
+    if len(sys.argv) > 1:
+        csv_path = sys.argv[1]
+        print(f"\n[1/2] Training on {csv_path}...")
+        train(csv_path)
+
+    print("\n[2/2] Running a sample prediction...")
+
+    # Example: a user who scored high on inattention + low on visual attention
+    result = predict(
+        # Conners — high inattention, moderate hyperactivity
+        cIM=28, cHR=14, cIE=12, cSC=8,
+
+        # IVA-2 — low visual attention, moderate auditory attention
+        Aqtot=82,  Aqaudi=90, Aqvis=74,
+        RCQtot=78, RCQaudi=85, RCQvis=70
+    )
+
+    print(f"\n  Predicted subtype : {result['subtype']}")
+    print(f"  Label             : {result['label']}")
+    print(f"  Confidence        : {result['confidence']:.0%}")
+    print(f"  All probabilities : {result['all_probs']}")
+    print("\n  This result will later come from game scores + questionnaire.")
+    print("=" * 55)
