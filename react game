@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <title>Focus Assessment — Go/No-Go</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:      #0d0f14;
+      --surface: #13161e;
+      --card:    #1b1f2b;
+      --border:  #252a38;
+      --text:    #dde3f0;
+      --muted:   #5a6180;
+      --go:      #f5c842;
+      --glow:    rgba(245,200,66,.3);
+      --accent:  #4f8ef7;
+      --green:   #34d399;
+      --red:     #f87171;
+      --mono:    'DM Mono', monospace;
+      --display: 'Syne', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--display);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 24px;
+      min-height: 100vh;
+      width: 100%;
+      animation: fadeIn .3s ease;
+    }
+    .screen.active { display: flex; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+    .eyebrow { font-family:var(--mono); font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:20px; }
+    h1 { font-size:clamp(36px,6vw,52px); font-weight:800; letter-spacing:-2px; line-height:1.05; margin-bottom:14px; }
+    h1 em { color:var(--go); font-style:normal; }
+    h2 { font-size:22px; font-weight:700; letter-spacing:-.5px; margin-bottom:28px; }
+    p.sub { font-family:var(--mono); font-size:13px; color:var(--muted); line-height:1.9; max-width:400px; margin-bottom:36px; }
+    .btn { background:var(--go); color:#0d0f14; border:none; font-family:var(--display); font-size:15px; font-weight:700; padding:16px 48px; border-radius:8px; cursor:pointer; transition:transform .15s, box-shadow .15s; }
+    .btn:hover { transform:translateY(-2px); box-shadow:0 8px 28px var(--glow); }
+    .btn.ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
+    .btn.ghost:hover { border-color:var(--accent); color:var(--accent); box-shadow:none; }
+    .stats { display:flex; gap:36px; margin-bottom:48px; }
+    .stat-val { font-size:32px; font-weight:800; letter-spacing:-1px; line-height:1; }
+    .stat-label { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-top:4px; }
+    .cards { display:flex; gap:16px; margin-bottom:32px; flex-wrap:wrap; justify-content:center; }
+    .icard { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; width:168px; }
+    .swatch { width:52px; height:52px; border-radius:10px; margin:0 auto 16px; }
+    .icard-title { font-size:15px; font-weight:700; margin-bottom:6px; }
+    .icard-sub { font-family:var(--mono); font-size:11px; color:var(--muted); line-height:1.6; }
+    .badge { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; padding:4px 14px; border-radius:4px; margin-bottom:20px; display:inline-block; }
+    .badge.practice { background:rgba(79,142,247,.1); color:var(--accent); border:1px solid rgba(79,142,247,.2); }
+    .badge.real { background:rgba(245,200,66,.1); color:var(--go); border:1px solid rgba(245,200,66,.2); }
+    #screen-game { gap:20px; }
+    .trial-info { font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:1px; height:20px; }
+    .grid { display:grid; grid-template-columns:repeat(4,78px); grid-template-rows:repeat(4,78px); gap:6px; padding:14px; background:var(--surface); border:1px solid var(--border); border-radius:14px; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; }
+    .cell { background:var(--card); border:1px solid var(--border); border-radius:8px; transition:background .07s, box-shadow .07s, border-color .07s; }
+    .cell.go { background:var(--go); border-color:var(--go); box-shadow:0 0 28px var(--glow); }
+    .cell.nogo { background:var(--card); border-color:var(--muted); }
+    .hint { font-family:var(--mono); font-size:11px; color:var(--muted); height:18px; letter-spacing:.5px; }
+    .progress-wrap { width:200px; height:2px; background:var(--border); border-radius:2px; margin-top:4px; }
+    .progress-fill { height:100%; background:var(--go); border-radius:2px; transition:width .3s; }
+    #screen-feedback { gap:10px; }
+    .fb-icon { font-size:52px; line-height:1; }
+    .fb-title { font-size:24px; font-weight:700; letter-spacing:-.5px; }
+    .fb-sub { font-family:var(--mono); font-size:12px; color:var(--muted); }
+    #screen-results { gap:0; overflow-y:auto; padding:60px 24px; }
+    .score-row { display:flex; gap:14px; margin-bottom:28px; flex-wrap:wrap; justify-content:center; }
+    .score-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:22px 24px; min-width:128px; text-align:center; position:relative; overflow:hidden; }
+    .score-card::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+    .score-card.a::after { background:var(--go); }
+    .score-card.b::after { background:var(--accent); }
+    .score-card.c::after { background:var(--green); }
+    .score-card.d::after { background:var(--muted); }
+    .score-num { font-size:38px; font-weight:800; letter-spacing:-2px; line-height:1; margin-bottom:6px; }
+    .score-name { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; }
+    .score-desc { font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:4px; line-height:1.5; }
+    .note-box { font-family:var(--mono); font-size:11px; color:var(--muted); line-height:1.9; max-width:420px; padding:16px 20px; border:1px solid var(--border); border-radius:8px; background:var(--surface); margin-bottom:20px; }
+    .json-label { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; align-self:flex-start; max-width:480px; width:100%; }
+    .json-box { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px 18px; font-family:var(--mono); font-size:11px; color:var(--accent); max-width:480px; width:100%; text-align:left; white-space:pre; overflow-x:auto; margin-bottom:28px; line-height:1.7; }
+    @media (max-width:400px) {
+      .grid { grid-template-columns:repeat(4,64px); grid-template-rows:repeat(4,64px); }
+      .stats { gap:20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="screen-welcome" class="screen active">
+  <div class="eyebrow">FocusOS — Cognitive Assessment</div>
+  <h1>Measure your<br><em>Visual Focus</em></h1>
+  <p class="sub">A grid-based attention task used in clinical ADHD research.<br>No right or wrong answers — just respond naturally.</p>
+  <div class="stats">
+    <div><div class="stat-val">15<span style="font-size:16px;color:var(--muted)">min</span></div><div class="stat-label">Duration</div></div>
+    <div><div class="stat-val">160</div><div class="stat-label">Trials</div></div>
+    <div><div class="stat-val">4</div><div class="stat-label">Scores</div></div>
+  </div>
+  <button class="btn" id="btn-welcome">Begin Assessment</button>
+</div>
+
+<div id="screen-instr" class="screen">
+  <h2>How it works</h2>
+  <div class="cards">
+    <div class="icard">
+      <div class="swatch" style="background:var(--go);box-shadow:0 0 20px var(--glow)"></div>
+      <div class="icard-title" style="color:var(--go)">Yellow — TAP</div>
+      <div class="icard-sub">Press spacebar or tap the screen as fast as you can</div>
+    </div>
+    <div class="icard">
+      <div class="swatch" style="background:var(--card);border:1px solid var(--muted)"></div>
+      <div class="icard-title" style="color:var(--muted)">Dark — WAIT</div>
+      <div class="icard-sub">Do nothing. Hold your response completely.</div>
+    </div>
+  </div>
+  <p class="sub">A square appears in one cell of a 4×4 grid.<br>Yellow = tap fast. Dark = stay still.<br>Speed matters, but so does accuracy.</p>
+  <button class="btn" id="btn-instr">Got it — start practice</button>
+</div>
+
+<div id="screen-practice-intro" class="screen">
+  <div class="badge practice">Practice Round</div>
+  <h2>20 practice trials<br>with feedback</h2>
+  <p class="sub">You'll see Correct or Too Soon after each tap.<br>Feedback stops in the real task.</p>
+  <button class="btn" id="btn-practice">Start practice</button>
+</div>
+
+<div id="screen-real-intro" class="screen">
+  <div class="badge real">Real Assessment</div>
+  <h2>Practice complete.<br>Real task begins now.</h2>
+  <p class="sub">160 trials. No feedback.<br>Stay focused — the task measures attention over time.<br>Take a breath.</p>
+  <button class="btn" id="btn-real">I'm ready — begin</button>
+</div>
+
+<div id="screen-game" class="screen">
+  <div class="trial-info" id="trial-info"></div>
+  <div class="grid" id="grid"></div>
+  <div class="hint" id="hint"></div>
+  <div class="progress-wrap"><div class="progress-fill" id="progress" style="width:0%"></div></div>
+</div>
+
+<div id="screen-feedback" class="screen">
+  <div class="fb-icon" id="fb-icon"></div>
+  <div class="fb-title" id="fb-title"></div>
+  <div class="fb-sub" id="fb-sub"></div>
+</div>
+
+<div id="screen-results" class="screen">
+  <div class="eyebrow" style="margin-bottom:16px">Assessment complete</div>
+  <h2 style="margin-bottom:32px">Your Focus Map</h2>
+  <div class="score-row" id="score-row"></div>
+  <div class="note-box">AQvis &lt; 70 or ICV &gt; 35% may indicate attention difficulties.<br>These scores are for clinical screening only — not a diagnosis.<br>A clinician will review your full profile.</div>
+  <div class="json-label">JSON → intake_processor.py</div>
+  <div class="json-box" id="json-box"></div>
+  <button class="btn ghost" id="btn-restart">Restart</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var CFG = { PRACTICE:20, REAL:160, GO:0.70, STIM:600, ISI_MIN:1500, ISI_MAX:2500, CELLS:16, API:'/api/intake', POST:false };
+
+  var state = { data:[], isPractice:true, idx:0, total:0, isGo:false, cell:0, t0:0, responded:false, blocked:true };
+
+  function $(id) { return document.getElementById(id); }
+
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    $(id).classList.add('active');
+  }
+
+  // ── GRID ──────────────────────────────────────────────────────
+  function buildGrid() {
+    var g = $('grid'); g.innerHTML = '';
+    for (var i = 0; i < CFG.CELLS; i++) {
+      var d = document.createElement('div');
+      d.className = 'cell'; d.id = 'c' + i; g.appendChild(d);
+    }
+  }
+
+  function setCell(idx, cls) {
+    for (var i = 0; i < CFG.CELLS; i++) $('c'+i).className = 'cell';
+    $('c'+idx).className = 'cell ' + cls;
+  }
+
+  function clearCells() {
+    for (var i = 0; i < CFG.CELLS; i++) $('c'+i).className = 'cell';
+  }
+
+  // ── TRIAL ─────────────────────────────────────────────────────
+  function nextTrial() {
+    if (state.idx >= state.total) {
+      state.isPractice ? show('screen-real-intro') : showResults();
+      return;
+    }
+    state.idx++;
+    state.isGo     = Math.random() < CFG.GO;
+    state.cell     = Math.floor(Math.random() * CFG.CELLS);
+    state.responded = false;
+    state.blocked  = false;
+
+    var phase = state.isPractice ? 'PRACTICE — ' : '';
+    $('trial-info').textContent = phase + 'TRIAL ' + state.idx + ' / ' + state.total;
+    $('hint').textContent = state.isGo ? 'TAP  →  yellow square' : '';
+    $('progress').style.width = (state.idx / state.total * 100) + '%';
+
+    setCell(state.cell, state.isGo ? 'go' : 'nogo');
+    state.t0 = performance.now();
+
+    setTimeout(function () {
+      state.blocked = true;
+      clearCells();
+      var rt      = state.responded ? Math.round(performance.now() - state.t0) : -1;
+      var correct = state.isGo ? state.responded : !state.responded;
+
+      if (!state.isPractice) {
+        state.data.push({ trial: state.idx, trial_type: state.isGo ? 'go' : 'nogo', responded: state.responded, rt: rt, correct: correct });
+      }
+
+      if (state.isPractice) {
+        feedback(state.isGo, state.responded, rt);
+      } else {
+        var isi = CFG.ISI_MIN + Math.random() * (CFG.ISI_MAX - CFG.ISI_MIN);
+        setTimeout(nextTrial, isi);
+      }
+    }, CFG.STIM);
+  }
+
+  // ── INPUT ─────────────────────────────────────────────────────
+  function tap() {
+    if (state.blocked || state.responded) return;
+    state.responded = true;
+  }
+
+  $('grid').addEventListener('click',      tap);
+  $('grid').addEventListener('touchstart', function(e){ e.preventDefault(); tap(); }, { passive: false });
+  document.addEventListener('keydown',     function(e){ if (e.code === 'Space') { e.preventDefault(); tap(); } });
+
+  // ── FEEDBACK ──────────────────────────────────────────────────
+  function feedback(isGo, responded, rt) {
+    var icon, title, sub, color;
+    if (isGo && responded)   { icon='✓'; title='Correct';   color='var(--green)'; sub=rt+'ms'; }
+    else if (isGo)            { icon='○'; title='Missed';    color='var(--red)';   sub='You should have tapped'; }
+    else if (responded)       { icon='✕'; title='Too soon';  color='var(--red)';   sub="Don't tap the dark square"; }
+    else                      { icon='✓'; title='Good hold'; color='var(--green)'; sub='Correct — you waited'; }
+    $('fb-icon').textContent  = icon;
+    $('fb-title').textContent = title;
+    $('fb-title').style.color = color;
+    $('fb-sub').textContent   = sub;
+    show('screen-feedback');
+    setTimeout(function(){ show('screen-game'); setTimeout(nextTrial, 800); }, 700);
+  }
+
+  // ── SCORING ───────────────────────────────────────────────────
+  function avg(a) { return a.length ? a.reduce(function(s,x){return s+x;},0)/a.length : 0; }
+  function std(a) {
+    if (a.length < 2) return 0;
+    var m = avg(a);
+    return Math.sqrt(a.reduce(function(s,x){return s+(x-m)*(x-m);},0)/a.length);
+  }
+  function lin(arr) {
+    var n = arr.length; if (n < 2) return 0;
+    var xs = arr.map(function(_,i){return i;}), mx = avg(xs), my = avg(arr);
+    var num = 0, den = 0;
+    for (var i=0;i<n;i++) { num += (xs[i]-mx)*(arr[i]-my); den += (xs[i]-mx)*(xs[i]-mx); }
+    return den ? +(num/den).toFixed(3) : 0;
+  }
+
+  function calcScores() {
+    var go   = state.data.filter(function(t){return t.trial_type==='go';});
+    var nogo = state.data.filter(function(t){return t.trial_type==='nogo';});
+    var hits        = go.filter(function(t){return t.responded;}).length;
+    var omissions   = go.length - hits;
+    var fa          = nogo.filter(function(t){return t.responded;}).length;
+    var cr          = nogo.length - fa;
+    var omPct       = go.length   ? omissions/go.length*100   : 0;
+    var coPct       = nogo.length ? fa/nogo.length*100         : 0;
+    var rts         = go.filter(function(t){return t.rt>0&&t.rt<3000;}).map(function(t){return t.rt;});
+    var meanRT      = +avg(rts).toFixed(1);
+    var sdRT        = +std(rts).toFixed(1);
+    var icv         = meanRT > 0 ? +(sdRT/meanRT*100).toFixed(1) : 0;
+    var vigSlope    = lin(go.map(function(t){return t.rt>0?t.rt:1500;}));
+    var aqvis       = Math.max(0, Math.min(100, Math.round(100 - omPct*2 - icv/2)));
+    var rcqvis      = Math.max(0, Math.min(100, Math.round(100 - coPct*3)));
+    return { aqvis:aqvis, rcqvis:rcqvis, icv:icv, meanRT:meanRT, sdRT:sdRT, vigSlope:vigSlope, omissions:omissions, fa:fa, hits:hits, cr:cr, omPct:+omPct.toFixed(1), coPct:+coPct.toFixed(1), goTotal:go.length, nogoTotal:nogo.length };
+  }
+
+  // ── RESULTS ───────────────────────────────────────────────────
+  function showResults() {
+    var s = calcScores();
+    var aqC  = s.aqvis  < 70 ? 'var(--red)' : s.aqvis  < 85 ? 'var(--go)' : 'var(--green)';
+    var rcqC = s.rcqvis < 70 ? 'var(--red)' : s.rcqvis < 85 ? 'var(--go)' : 'var(--green)';
+    var icvC = s.icv    > 35 ? 'var(--red)' : s.icv    > 25 ? 'var(--go)' : 'var(--green)';
+
+    $('score-row').innerHTML =
+      card('a', s.aqvis,  aqC,  'AQvis',  'Visual Attention<br>Quotient') +
+      card('b', s.rcqvis, rcqC, 'RCQvis', 'Visual Response<br>Control') +
+      card('c', s.icv+'%', icvC,'ICV',    'Reaction Time<br>Variability') +
+      card('d', s.meanRT, 'var(--text)', 'Mean RT', 'Milliseconds<br>(avg speed)');
+
+    var payload = {
+      id: 'user_' + Date.now(), Gender: '1',
+      game: { total_trials: s.goTotal+s.nogoTotal, target_trials: s.goTotal, hits: s.hits, misses: s.omissions, correct_rejections: s.cr, false_alarms: s.fa, reaction_times: state.data.filter(function(t){return t.trial_type==='go'&&t.rt>0;}).map(function(t){return t.rt;}) },
+      scores: { aqvis: s.aqvis, rcqvis: s.rcqvis, icv: s.icv, mean_rt: s.meanRT, vigilance_slope: s.vigSlope, omission_pct: s.omPct, commission_pct: s.coPct }
+    };
+
+    $('json-box').textContent = JSON.stringify(payload, null, 2);
+    if (CFG.POST) { fetch(CFG.API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) }).catch(console.warn); }
+    show('screen-results');
+  }
+
+  function card(cls, val, color, name, desc) {
+    return '<div class="score-card '+cls+'"><div class="score-num" style="color:'+color+'">'+val+'</div><div class="score-name">'+name+'</div><div class="score-desc">'+desc+'</div></div>';
+  }
+
+  // ── BUTTON WIRING ─────────────────────────────────────────────
+  $('btn-welcome').onclick  = function(){ show('screen-instr'); };
+  $('btn-instr').onclick    = function(){ show('screen-practice-intro'); };
+  $('btn-practice').onclick = function(){
+    state.isPractice = true; state.total = CFG.PRACTICE; state.idx = 0;
+    buildGrid(); show('screen-game'); setTimeout(nextTrial, 600);
+  };
+  $('btn-real').onclick = function(){
+    state.isPractice = false; state.total = CFG.REAL; state.idx = 0; state.data = [];
+    buildGrid(); show('screen-game'); setTimeout(nextTrial, 600);
+  };
+  $('btn-restart').onclick  = function(){ location.reload(); };
+
+})();
+</script>
+</body>
+</html>
